@@ -1,0 +1,50 @@
+# MediaPipe graph that performs action recognition with TensorFlow Lite on GPU.
+
+type: "ActionRecognitionGpu"
+
+# GPU buffer. (GpuBuffer)
+input_stream: "IMAGE_GPU:throttled_input_video"
+
+# Pose Landmark Model Output. (Normalized Landmarks)
+input_stream: "NORM_LANDMARKS:pose_landmarks"
+
+# Action Recognition Model Output. (Tensors)
+output_stream: "TENSORS:output_tensors"
+
+
+# Calculates size of the image.
+node {
+  calculator: "ImagePropertiesCalculator"
+  input_stream: "IMAGE_GPU:throttled_input_video"
+  output_stream: "SIZE:image_size"
+}
+
+node {
+  calculator: "LandmarksToCustomTensorCalculator"
+  input_stream: "NORM_LANDMARKS:pose_landmarks"
+  input_stream: "IMAGE_SIZE:image_size"
+  output_stream: "TENSORS:tensors"
+  options: {
+    [mediapipe.LandmarksToCustomTensorCalculatorOptions.ext] {
+      attributes: [ X, Y, Z, VISIBILITY, PRESENCE]
+    }
+  }
+}
+
+
+node {
+  calculator: "InferenceCalculator"
+  input_stream: "TENSORS:tensors"
+  output_stream: "TENSORS:output_tensors"
+  options: {
+    [mediapipe.InferenceCalculatorOptions.ext] {
+      model_path: "mediapipe/modules/pose_landmark/saved_model_30_clean.tflite"
+      delegate { gpu {} } #not specified, will use gpup by default
+    }
+  }
+}
+
+node {
+  calculator: "VerifyModelOutputCalculator"
+  input_stream: "TENSORS:output_tensors"
+}
